@@ -1,5 +1,5 @@
 export const SITE_NAME = "Mud Pit Canada";
-export const DEFAULT_SITE_URL = "https://mudpitcanada.com";
+export const DEFAULT_SITE_URL = "https://mudpitcleaning.com";
 export const EMERGENCY_PHONE_DISPLAY = "1-888-702-2090";
 export const EMERGENCY_PHONE_E164 = "+18887022090";
 

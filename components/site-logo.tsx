@@ -12,7 +12,7 @@ export function SiteLogo({ href = "/", invert = false }: SiteLogoProps) {
         MP
       </span>
       <span className="wmc-logo-copy">
-        <strong className={invert ? "text-white" : "text-[var(--ink)]"}>Mud Pit Canada</strong>
+        <strong className={invert ? "text-white" : "text-[var(--ink)]"}>Mud Pit Cleaning</strong>
         <span className={invert ? "text-white/72" : "text-[var(--muted)]"}>Industrial cleaning dispatch</span>
       </span>
     </Link>

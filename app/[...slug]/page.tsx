@@ -8,8 +8,10 @@ import {
   buildCanonicalPath,
   buildFaqs,
   buildMeta,
+  buildLocationFacts,
   buildSchemas,
   buildServiceFocus,
+  getPagesByService,
   getPagesByCity,
   getRelatedPages,
   getWaterMainPageBySlug,
@@ -48,6 +50,11 @@ export default async function LandingPage({ params }: PageProps) {
   const serviceFocus = buildServiceFocus(page);
   const relatedPages = getRelatedPages(page);
   const cityPages = page.city ? getPagesByCity(page.city).filter((item) => item.slug !== page.slug).slice(0, 5) : [];
+  const serviceHubPage = WATERMAIN_PAGES.find((item) => item.isHub && item.serviceSlug === page.serviceSlug);
+  const serviceCityPages = page.isHub
+    ? getPagesByService(page.serviceSlug).filter((item) => !item.isHub)
+    : [];
+  const locationFacts = buildLocationFacts(page);
   const placeLabel = page.city ? `${page.city}, ${page.provinceCode}` : "Canada-wide";
 
   return (
@@ -93,9 +100,32 @@ export default async function LandingPage({ params }: PageProps) {
               containment, and documentation. The practical path is to identify what is present, remove it cleanly, and
               leave the site with maintenance notes that reduce repeat disruption.
             </p>
+            {page.city ? (
+              <p>
+                For {page.city}, this page keeps the scope specific to local dispatch realities: weather windows,
+                access constraints, waste routing expectations, and cross-service handoff if the first symptom points to
+                a different system. That keeps recommendations useful for operations teams instead of generic service copy.
+              </p>
+            ) : null}
           </article>
         </div>
       </section>
+
+      {locationFacts.length ? (
+        <section className="wmc-section">
+          <div className="wmc-container wmc-ops-grid">
+            <div>
+              <p className="wmc-kicker">Local Context</p>
+              <h2 className="wmc-title">Location facts for {page.city} dispatch planning.</h2>
+            </div>
+            <div className="wmc-checklist">
+              {locationFacts.map((fact) => (
+                <p key={fact}>{fact}</p>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="wmc-process-section">
         <div className="wmc-container">
@@ -154,14 +184,37 @@ export default async function LandingPage({ params }: PageProps) {
             <h2 className="wmc-title">{page.city ? `More work scopes in ${page.city}.` : "Related Canadian service hubs."}</h2>
           </div>
           <div className="wmc-link-list">
+            {page.city && serviceHubPage ? (
+              <Link href={`/${serviceHubPage.slug}`}>
+                {page.service} Canada service hub
+              </Link>
+            ) : null}
             {[...cityPages, ...relatedPages].slice(0, 8).map((item) => (
               <Link key={item.slug} href={`/${item.slug}`}>
-                {item.city ? `${item.service} / ${item.city}` : item.service}
+                {item.city ? `${item.service} ${item.city}` : `${item.service} Canada`}
               </Link>
             ))}
           </div>
         </div>
       </section>
+
+      {page.isHub ? (
+        <section className="wmc-related-section">
+          <div className="wmc-container wmc-related-layout">
+            <div>
+              <p className="wmc-kicker">City Coverage</p>
+              <h2 className="wmc-title">{page.service} city pages in this service cluster.</h2>
+            </div>
+            <div className="wmc-link-list">
+              {serviceCityPages.map((item) => (
+                <Link key={item.slug} href={`/${item.slug}`}>
+                  {`${page.primaryKeyword} ${item.city}`}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="wmc-closing-section">
         <div className="wmc-container wmc-final-panel">

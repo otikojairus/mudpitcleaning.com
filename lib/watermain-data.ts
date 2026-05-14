@@ -20685,12 +20685,48 @@ export function buildCanonicalPath(slug: string) {
   return "/" + slug.replace(/^\/+|\/+$/g, "");
 }
 
+function toTitleCase(value: string) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function normalizeKeyword(value: string) {
+  return toTitleCase(value.replace(/\s+/g, " ").trim());
+}
+
+function clampText(value: string, max: number) {
+  if (value.length <= max) {
+    return value;
+  }
+  const sliced = value.slice(0, max - 1);
+  return `${sliced.slice(0, Math.max(0, sliced.lastIndexOf(" ")))}…`;
+}
+
+function buildSeoTitle(page: WaterMainPage) {
+  const cityToken = page.city ? ` ${page.city}` : " Canada";
+  const keyword = normalizeKeyword(page.primaryKeyword);
+  const withCity = page.city && keyword.toLowerCase().includes(page.city.toLowerCase()) ? keyword : `${keyword}${cityToken}`;
+  return clampText(`${withCity} | ${SITE_NAME}`, 60);
+}
+
+function buildSeoDescription(page: WaterMainPage) {
+  const keyword = normalizeKeyword(page.primaryKeyword);
+  const locationLabel = page.city ? `${page.city}, ${page.provinceCode}` : "Canada";
+  const seed = `${keyword} in ${locationLabel}. Call ${SITE_NAME} for fast dispatch, site-safe cleanup, and compliant disposal planning.`;
+  return trimMetaDescription(seed, 160);
+}
+
 export function buildMeta(page: WaterMainPage): Metadata {
+  const title = buildSeoTitle(page);
+  const description = buildSeoDescription(page);
   return {
-    title: page.title,
-    description: trimMetaDescription(page.metaDescription),
+    title,
+    description,
     alternates: { canonical: buildCanonicalPath(page.slug) },
-    openGraph: { title: page.title, description: trimMetaDescription(page.metaDescription), url: absoluteUrl(buildCanonicalPath(page.slug)), type: "website", siteName: SITE_NAME },
+    openGraph: { title, description, url: absoluteUrl(buildCanonicalPath(page.slug)), type: "website", siteName: SITE_NAME },
     robots: { index: true, follow: true },
   };
 }
@@ -20711,13 +20747,49 @@ export function buildServiceFocus(page: WaterMainPage) {
   return { summary: page.serviceSummary, points: ["Confirm what material is present before selecting equipment or disposal path.", "Plan access, hose reach, traffic control, and site safety before crews arrive.", "Use the visit to document recurring buildup, damaged inlets, pump issues, or drainage restrictions."] };
 }
 
+const PROVINCE_CLIMATE_FACTS: Record<string, string> = {
+  AB: "Alberta jobs usually include freeze-thaw planning, especially for winter access and hose management.",
+  BC: "British Columbia operations often account for heavy rainfall windows and runoff control around drains and pits.",
+  MB: "Manitoba cleanup scheduling often factors in deep winter freeze periods and spring melt transitions.",
+  NB: "New Brunswick planning often balances winter freeze cycles with wet shoulder-season site access.",
+  NL: "Newfoundland and Labrador jobs often include coastal weather allowances and wind-exposed access planning.",
+  NS: "Nova Scotia work plans usually include coastal precipitation and storm-event recovery windows.",
+  NT: "Northwest Territories work windows are often seasonal, with winter constraints and short high-access periods.",
+  NU: "Nunavut scheduling often depends on remote logistics, weather windows, and strict seasonal planning.",
+  ON: "Ontario service plans often account for freeze-thaw cycles and spring runoff around catchment infrastructure.",
+  PE: "Prince Edward Island planning often includes coastal rain events and drainage surge periods.",
+  QC: "Quebec site work often requires winterization planning and spring thaw drainage checks.",
+  SK: "Saskatchewan operations often combine cold-weather access planning with wind and seasonal runoff conditions.",
+  YT: "Yukon jobs are usually scheduled around short seasonal work windows and remote access logistics.",
+};
+
+export function buildLocationFacts(page: WaterMainPage) {
+  if (!page.city) {
+    return [];
+  }
+  const climateFact = PROVINCE_CLIMATE_FACTS[page.provinceCode] || `Crews in ${page.city} typically plan around seasonal weather changes before dispatch.`;
+  const sameCityServiceCount = getPagesByCity(page.city).length;
+  return [
+    `${page.city} is in ${page.province} (${page.provinceCode}), so dispatch plans are localized to provincial disposal and site-safety expectations.`,
+    climateFact,
+    `${sameCityServiceCount} service-specific pages are mapped for ${page.city}, helping crews route requests by exact work scope instead of generic callouts.`,
+  ];
+}
+
 export function buildSchemas(page: WaterMainPage) {
   const faqs = buildFaqs(page);
   const areaServed = page.city ? { "@type": "City", name: page.city } : { "@type": "Country", name: "Canada" };
+  const serviceHub = WATERMAIN_PAGES.find((item) => item.isHub && item.serviceSlug === page.serviceSlug);
+  const breadcrumbItems = [
+    { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Services", item: absoluteUrl("/services") },
+    ...(serviceHub ? [{ "@type": "ListItem", position: 3, name: page.service, item: absoluteUrl(buildCanonicalPath(serviceHub.slug)) }] : []),
+    { "@type": "ListItem", position: serviceHub ? 4 : 3, name: page.city ? `${page.service} ${page.city}` : page.service, item: absoluteUrl(buildCanonicalPath(page.slug)) },
+  ];
   return [
     { "@context": "https://schema.org", "@type": page.city ? "LocalBusiness" : "Organization", name: page.city ? SITE_NAME + " - " + page.city : SITE_NAME, description: page.metaDescription, url: absoluteUrl(buildCanonicalPath(page.slug)), telephone: EMERGENCY_PHONE_E164, priceRange: "$$", areaServed, ...(page.city ? { address: { "@type": "PostalAddress", addressLocality: page.city, addressRegion: page.provinceCode, addressCountry: "CA" } } : {}) },
     { "@context": "https://schema.org", "@type": "Service", name: page.service, provider: { "@type": "Organization", name: SITE_NAME }, areaServed, serviceType: page.service },
     { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map((faq) => ({ "@type": "Question", name: faq.question, acceptedAnswer: { "@type": "Answer", text: faq.answer } })) },
-    { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") }, { "@type": "ListItem", position: 2, name: page.service, item: absoluteUrl(buildCanonicalPath(page.slug)) }] },
+    { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: breadcrumbItems },
   ];
 }
